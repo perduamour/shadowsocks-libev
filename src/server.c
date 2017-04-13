@@ -685,7 +685,7 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
         if (buf->len == DYN_KEY_LEN) {
             buf->data[buf->len] = '\0';
             //Set new key from haproxy
-            server->cipher->key_len = crypto_parse_key(buf->data, server->cipher->key, cipher_key_size(server->cipher));
+            server->cipher->key_len = crypto_parse_key(buf->data, server->cipher->key, crypto->cipher->key_len);
             server->stage = STAGE_INIT;
             buf->len = 0;
         }
