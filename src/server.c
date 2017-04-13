@@ -90,6 +90,8 @@
 
 #endif
 
+#define DYN_KEY_LEN 40
+
 static void signal_cb(EV_P_ ev_signal *w, int revents);
 static void accept_cb(EV_P_ ev_io *w, int revents);
 static void server_send_cb(EV_P_ ev_io *w, int revents);
@@ -658,6 +660,37 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
     remote_t *remote              = NULL;
 
     buffer_t *buf = server->buf;
+
+    if (server->stage == STAGE_CRYPTO) {
+        ssize_t r = recv(server->fd, (buf->data + buf->len), (DYN_KEY_LEN - buf->len), 0);
+        if (r == 0) {
+            if (verbose) {
+                LOGI("server_recv close the connection");
+            }
+            close_and_free_remote(EV_A_ remote);
+            close_and_free_server(EV_A_ server);
+            return;
+        } else if (r == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return;
+            } else {
+                ERROR("server recv");
+                close_and_free_remote(EV_A_ remote);
+                close_and_free_server(EV_A_ server);
+                return;
+            }
+        }
+
+        buf->len += r;
+        if (buf->len == DYN_KEY_LEN) {
+            buf->data[buf->len] = '\0';
+            //Set new key from haproxy
+            server->cipher->key_len = crypto_parse_key(buf->data, server->cipher->key, cipher_key_size(server->cipher));
+            server->stage = STAGE_INIT;
+            buf->len = 0;
+        }
+        return;
+    }
 
     if (server->stage == STAGE_STREAM) {
         remote = server->remote;
@@ -1296,6 +1329,9 @@ new_server(int fd, listen_ctx_t *listener)
 
     memset(server, 0, sizeof(server_t));
 
+    server->cipher     = ss_malloc(sizeof(cipher_t));
+    memcpy(server->cipher, crypto->cipher, sizeof(cipher_t));
+
     server->recv_ctx   = ss_malloc(sizeof(server_ctx_t));
     server->send_ctx   = ss_malloc(sizeof(server_ctx_t));
     server->buf        = ss_malloc(sizeof(buffer_t));
@@ -1315,8 +1351,8 @@ new_server(int fd, listen_ctx_t *listener)
 
     server->e_ctx = ss_align(sizeof(cipher_ctx_t));
     server->d_ctx = ss_align(sizeof(cipher_ctx_t));
-    crypto->ctx_init(crypto->cipher, server->e_ctx, 1);
-    crypto->ctx_init(crypto->cipher, server->d_ctx, 0);
+    crypto->ctx_init(server->cipher, server->e_ctx, 1);
+    crypto->ctx_init(server->cipher, server->d_ctx, 0);
 
     int request_timeout = min(MAX_REQUEST_TIMEOUT, listener->timeout)
                           + rand() % MAX_REQUEST_TIMEOUT;
@@ -1361,6 +1397,9 @@ free_server(server_t *server)
     if (server->buf != NULL) {
         bfree(server->buf);
         ss_free(server->buf);
+    }
+    if (server->cipher != NULL) {
+        ss_free(server->cipher);
     }
 
     ss_free(server->recv_ctx);
