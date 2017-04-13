@@ -87,6 +87,7 @@ typedef struct server {
 #ifdef USE_NFCONNTRACK_TOS
     struct dscptracker* tracker;
 #endif
+    cipher_t *cipher;
 } server_t;
 
 typedef struct query {

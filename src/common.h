@@ -57,6 +57,7 @@ int send_traffic_stat(uint64_t tx, uint64_t rx);
 #define STAGE_RESOLVE    4  /* Resolve the hostname             */
 #define STAGE_WAIT       5  /* Wait for more data               */
 #define STAGE_STREAM     6  /* Stream between client and server */
+#define STAGE_CRYPTO     7
 
 /* Vals for long options */
 enum {
