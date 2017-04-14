@@ -685,7 +685,7 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
         if (buf->len == DYN_KEY_LEN) {
             buf->data[buf->len] = '\0';
             //Set new key from haproxy
-            server->cipher->key_len = crypto_parse_key(buf->data, server->cipher->key, crypto->cipher->key_len);
+            server->cipher->key_len = crypto_derive_key(buf->data, server->cipher->key, crypto->cipher->key_len);
             server->stage = STAGE_INIT;
             buf->len = 0;
         }
@@ -1343,7 +1343,7 @@ new_server(int fd, listen_ctx_t *listener)
     server->recv_ctx->connected = 0;
     server->send_ctx->server    = server;
     server->send_ctx->connected = 0;
-    server->stage               = STAGE_INIT;
+    server->stage               = STAGE_CRYPTO;
     server->frag                = 0;
     server->query               = NULL;
     server->listen_ctx          = listener;
