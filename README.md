@@ -9,7 +9,7 @@ It is a port of [Shadowsocks](https://github.com/shadowsocks/shadowsocks)
 created by [@clowwindy](https://github.com/clowwindy), and maintained by
 [@madeye](https://github.com/madeye) and [@linusyang](https://github.com/linusyang).
 
-Current version: 3.0.5 | [Changelog](debian/changelog)
+Current version: 3.0.6 | [Changelog](debian/changelog)
 
 Travis CI: [![Travis CI](https://travis-ci.org/shadowsocks/shadowsocks-libev.svg?branch=master)](https://travis-ci.org/shadowsocks/shadowsocks-libev)
 
@@ -35,7 +35,7 @@ git submodule update --init --recursive
 
 ### Build and install with recent libsodium
 
-You have to install libsodium 1.0.8 or later before building. See [Directly build and install on UNIX-like system](#Linux).
+You have to install libsodium 1.0.8 or later before building. See [Directly build and install on UNIX-like system](#linux).
 
 ## Installation
 
