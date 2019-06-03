@@ -1309,8 +1309,8 @@ remote_send_cb(EV_P_ ev_io *w, int revents)
             //send round trip time back to client
             struct timespec ts;
             clock_gettime(CLOCK_MONOTONIC, &ts);
-            uint32_t duration = (ts.tv_sec * 1000000 + ts.tv_nsec / 1000) -
-                    (remote->start_time.tv_sec * 1000000 + remote->start_time.tv_nsec / 1000);
+            uint32_t duration = (ts.tv_sec * 1000 + ts.tv_nsec / 1000000) -
+                    (remote->start_time.tv_sec * 1000 + remote->start_time.tv_nsec / 1000000);
             *(uint32_t*)server->buf->data = htonl(duration);
             server->buf->len = sizeof(uint32_t);
             server->buf->idx = 0;
