@@ -111,6 +111,7 @@ typedef struct remote_ctx {
 
 typedef struct remote {
     int fd;
+    struct timespec start_time;
 #ifdef TCP_FASTOPEN_WINSOCK
     OVERLAPPED olap;
     int connect_ex_done;
