@@ -78,6 +78,8 @@ typedef struct server {
     int fd;
     int stage;
     int frag;
+    int speed_test_mode;
+    int speed_test_remain;
 
     buffer_t *buf;
 

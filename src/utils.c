@@ -410,6 +410,8 @@ usage()
         "       [--key <key_in_base64>]    Key of your remote server.\n");
 #endif
     printf(
+        "       [--speed-test-size <size_in_megabytes>]    Byte size for speed test, default to 2 (2M).\n");
+    printf(
         "       [--plugin <name>]          Enable SIP003 plugin. (Experimental)\n");
     printf(
         "       [--plugin-opts <options>]  Set SIP003 plugin options. (Experimental)\n");

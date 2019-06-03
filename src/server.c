@@ -109,6 +109,7 @@ static void resolv_free_cb(void *data);
 
 int verbose      = 0;
 int reuse_port   = 0;
+int speed_test_size = 2 * 1024 * 1024;//default 2M
 
 int is_bind_local_addr = 0;
 struct sockaddr_storage local_addr_v4;
@@ -908,6 +909,31 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
             info.ai_protocol = IPPROTO_TCP;
             info.ai_addrlen  = sizeof(struct sockaddr_in6);
             info.ai_addr     = (struct sockaddr *)addr;
+        } else if ((atyp & ADDRTYPE_MASK) == 0xF) {
+            // Speed test mode
+            server->speed_test_mode = 1;
+            rand_bytes(server->buf->data, SOCKET_BUF_SIZE);
+            server->buf->len = SOCKET_BUF_SIZE;
+            server->buf->idx = 0;
+            int s = send(server->fd, server->buf->data, server->buf->len, 0);
+
+            if (s == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // no data, wait for send
+                    server->buf->idx = 0;
+                } else {
+                    ERROR("server_send_test");
+                    close_and_free_server(EV_A_ server);
+                    return;
+                }
+            } else if (s < server->buf->len) {
+                server->buf->len -= s;
+                server->buf->idx  = s;
+            }
+
+            ev_io_stop(EV_A_ & server->recv_ctx->io);
+            ev_io_start(EV_A_ & server->send_ctx->io);
+            return;
         }
 
         if (offset == 1) {
@@ -988,7 +1014,7 @@ server_send_cb(EV_P_ ev_io *w, int revents)
     server_t *server              = server_send_ctx->server;
     remote_t *remote              = server->remote;
 
-    if (remote == NULL) {
+    if (!server->speed_test_mode && remote == NULL) {
         LOGE("invalid server");
         close_and_free_server(EV_A_ server);
         return;
@@ -1012,25 +1038,36 @@ server_send_cb(EV_P_ ev_io *w, int revents)
                 close_and_free_remote(EV_A_ remote);
                 close_and_free_server(EV_A_ server);
             }
-            return;
-        } else if (s < server->buf->len) {
-            // partly sent, move memory, wait for the next time to send
-            server->buf->len -= s;
-            server->buf->idx += s;
-            return;
         } else {
-            // all sent out, wait for reading
-            server->buf->len = 0;
-            server->buf->idx = 0;
-            ev_io_stop(EV_A_ & server_send_ctx->io);
-            if (remote != NULL) {
-                ev_io_start(EV_A_ & remote->recv_ctx->io);
-                return;
+            if (server->speed_test_mode) {
+                server->speed_test_remain -= s;
+            }
+
+            if (s < server->buf->len) {
+                // partly sent, move memory, wait for the next time to send
+                server->buf->len -= s;
+                server->buf->idx += s;
             } else {
-                LOGE("invalid remote");
-                close_and_free_remote(EV_A_ remote);
-                close_and_free_server(EV_A_ server);
-                return;
+                if (server->speed_test_mode) {
+                    if (server->speed_test_remain > 0) {
+                        server->buf->idx = 0;
+                        server->buf->len = min(server->speed_test_remain, SOCKET_BUF_SIZE);
+                    } else {
+                        close_and_free_server(EV_A_ server);
+                    }
+                } else {
+                    // all sent out, wait for reading
+                    server->buf->len = 0;
+                    server->buf->idx = 0;
+                    ev_io_stop(EV_A_ & server_send_ctx->io);
+                    if (remote != NULL) {
+                        ev_io_start(EV_A_ & remote->recv_ctx->io);
+                    } else {
+                        LOGE("invalid remote");
+                        close_and_free_remote(EV_A_ remote);
+                        close_and_free_server(EV_A_ server);
+                    }
+                }
             }
         }
     }
@@ -1415,6 +1452,8 @@ new_server(int fd, listen_ctx_t *listener)
     server->send_ctx->connected = 0;
     server->stage               = STAGE_INIT;
     server->frag                = 0;
+    server->speed_test_mode     = 0;
+    server->speed_test_remain   = speed_test_size;
     server->query               = NULL;
     server->listen_ctx          = listener;
     server->remote              = NULL;
@@ -1632,6 +1671,7 @@ main(int argc, char **argv)
         { "plugin-opts",     required_argument, NULL, GETOPT_VAL_PLUGIN_OPTS },
         { "password",        required_argument, NULL, GETOPT_VAL_PASSWORD    },
         { "key",             required_argument, NULL, GETOPT_VAL_KEY         },
+        { "speed-test-size", required_argument, NULL, GETOPT_VAL_SPEED_TEST_SIZE },
 #ifdef __linux__
         { "mptcp",           no_argument,       NULL, GETOPT_VAL_MPTCP       },
 #endif
@@ -1745,6 +1785,9 @@ main(int argc, char **argv)
             // The option character is not recognized.
             LOGE("Unrecognized option: %s", optarg);
             opterr = 1;
+            break;
+        case GETOPT_VAL_SPEED_TEST_SIZE:
+            speed_test_size = atoi(optarg) * 1024 * 1024;
             break;
         }
     }
