@@ -23,6 +23,7 @@
 #ifndef _SERVER_H
 #define _SERVER_H
 
+#include <stdbool.h>
 #include <time.h>
 #include <libcork/ds.h>
 
@@ -78,7 +79,8 @@ typedef struct server {
     int fd;
     int stage;
     int frag;
-    int speed_test_mode;
+    bool return_remote_ttl;
+    bool speed_test_mode;
     int speed_test_remain;
 
     buffer_t *buf;

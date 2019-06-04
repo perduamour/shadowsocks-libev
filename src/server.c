@@ -911,7 +911,7 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
             info.ai_addr     = (struct sockaddr *)addr;
         } else if ((atyp & ADDRTYPE_MASK) == 0xF) {
             // Speed test mode
-            server->speed_test_mode = 1;
+            server->speed_test_mode = true;
             rand_bytes(server->buf->data, SOCKET_BUF_SIZE);
             server->buf->len = SOCKET_BUF_SIZE;
             server->buf->idx = 0;
@@ -960,6 +960,10 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
                 LOGI("[%s] connect to [%s]:%d", remote_port, host, ntohs(port));
             else
                 LOGI("[%s] connect to %s:%d", remote_port, host, ntohs(port));
+        }
+
+        if (atyp & 0xF0) {
+            server->return_remote_ttl = true;
         }
 
         if (!need_query) {
@@ -1306,28 +1310,30 @@ remote_send_cb(EV_P_ ev_io *w, int revents)
             // Clear the state of this address in the block list
             reset_addr(server->fd);
 
-            //send round trip time back to client
-            struct timespec ts;
-            clock_gettime(CLOCK_MONOTONIC, &ts);
-            uint32_t duration = (ts.tv_sec * 1000 + ts.tv_nsec / 1000000) -
-                    (remote->start_time.tv_sec * 1000 + remote->start_time.tv_nsec / 1000000);
-            *(uint32_t*)server->buf->data = htonl(duration);
-            server->buf->len = sizeof(uint32_t);
-            server->buf->idx = 0;
-            int s = send(server->fd, server->buf->data, server->buf->len, 0);
+            if (server->return_remote_ttl) {
+                //send round trip time back to client
+                struct timespec ts;
+                clock_gettime(CLOCK_MONOTONIC, &ts);
+                uint32_t duration = (ts.tv_sec * 1000 + ts.tv_nsec / 1000000) -
+                                    (remote->start_time.tv_sec * 1000 + remote->start_time.tv_nsec / 1000000);
+                *(uint32_t*)server->buf->data = htonl(duration);
+                server->buf->len = sizeof(uint32_t);
+                server->buf->idx = 0;
+                int s = send(server->fd, server->buf->data, server->buf->len, 0);
 
-            if (s == -1) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    // no data, wait for send
-                    server->buf->idx = 0;
-                } else {
-                    ERROR("server_send_test");
-                    close_and_free_server(EV_A_ server);
-                    return;
+                if (s == -1) {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        // no data, wait for send
+                        server->buf->idx = 0;
+                    } else {
+                        ERROR("server_send_test");
+                        close_and_free_server(EV_A_ server);
+                        return;
+                    }
+                } else if (s < server->buf->len) {
+                    server->buf->len -= s;
+                    server->buf->idx  = s;
                 }
-            } else if (s < server->buf->len) {
-                server->buf->len -= s;
-                server->buf->idx  = s;
             }
 
             if (remote->buf->len == 0) {
@@ -1477,7 +1483,8 @@ new_server(int fd, listen_ctx_t *listener)
     server->send_ctx->connected = 0;
     server->stage               = STAGE_INIT;
     server->frag                = 0;
-    server->speed_test_mode     = 0;
+    server->return_remote_ttl   = false;
+    server->speed_test_mode     = false;
     server->speed_test_remain   = speed_test_size;
     server->query               = NULL;
     server->listen_ctx          = listener;
