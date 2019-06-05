@@ -962,7 +962,7 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
                 LOGI("[%s] connect to %s:%d", remote_port, host, ntohs(port));
         }
 
-        if (atyp & 0xF0) {
+        if (atyp & 0x80) {
             server->return_remote_ttl = true;
         }
 
