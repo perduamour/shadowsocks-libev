@@ -915,23 +915,6 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
             rand_bytes(server->buf->data, SOCKET_BUF_SIZE);
             server->buf->len = SOCKET_BUF_SIZE;
             server->buf->idx = 0;
-            int s = send(server->fd, server->buf->data, server->buf->len, 0);
-
-            if (s == -1) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    // no data, wait for send
-                    server->buf->idx = 0;
-                } else {
-                    ERROR("server_send_test");
-                    close_and_free_server(EV_A_ server);
-                    return;
-                }
-            } else if (s < server->buf->len) {
-                server->buf->len -= s;
-                server->buf->idx  = s;
-            }
-
-            ev_io_stop(EV_A_ & server->recv_ctx->io);
             ev_io_start(EV_A_ & server->send_ctx->io);
             return;
         }
