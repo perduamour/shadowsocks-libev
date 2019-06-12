@@ -289,7 +289,9 @@ reset_addr(int fd)
     char *peer_name;
     peer_name = get_peer_name(fd);
     if (peer_name != NULL) {
-        remove_from_block_list(peer_name);
+        if (strcmp(peer_name, "172.30.0.1") != 0) {
+            remove_from_block_list(peer_name);
+        }
     }
 }
 
@@ -1622,11 +1624,11 @@ accept_cb(EV_P_ ev_io *w, int revents)
         if (!in_white_list && plugin == NULL
             && check_block_list(peer_name)) {
             LOGE("block all requests from %s", peer_name);
-#ifdef __linux__
-            set_linger(serverfd);
-#endif
-            close(serverfd);
-            return;
+//#ifdef __linux__
+//            set_linger(serverfd);
+//#endif
+//            close(serverfd);
+//            return;
         }
     }
 
