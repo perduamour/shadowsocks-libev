@@ -813,7 +813,7 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
 
         int offset     = 0;
         int need_query = 0;
-        char atyp      = server->buf->data[offset++];
+        unsigned char atyp = server->buf->data[offset++];
         char host[255] = { 0 };
         uint16_t port  = 0;
         struct addrinfo info;
@@ -822,7 +822,7 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
         memset(&storage, 0, sizeof(struct sockaddr_storage));
 
         // get remote addr and port
-        if ((atyp & ADDRTYPE_MASK) == 1) {
+        if (atyp == 0x81) {
             // IP V4
             struct sockaddr_in *addr = (struct sockaddr_in *)&storage;
             size_t in_addr_len       = sizeof(struct in_addr);
@@ -843,7 +843,7 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
             info.ai_protocol = IPPROTO_TCP;
             info.ai_addrlen  = sizeof(struct sockaddr_in);
             info.ai_addr     = (struct sockaddr *)addr;
-        } else if ((atyp & ADDRTYPE_MASK) == 3) {
+        } else if (atyp == 0x83) {
             // Domain name
             uint8_t name_len = *(uint8_t *)(server->buf->data + offset);
             if (name_len + 4 <= server->buf->len) {
@@ -889,7 +889,7 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
                 }
                 need_query = 1;
             }
-        } else if ((atyp & ADDRTYPE_MASK) == 4) {
+        } else if (atyp == 0x84) {
             // IP V6
             struct sockaddr_in6 *addr = (struct sockaddr_in6 *)&storage;
             size_t in6_addr_len       = sizeof(struct in6_addr);
@@ -911,7 +911,7 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
             info.ai_protocol = IPPROTO_TCP;
             info.ai_addrlen  = sizeof(struct sockaddr_in6);
             info.ai_addr     = (struct sockaddr *)addr;
-        } else if ((atyp & ADDRTYPE_MASK) == 0xF) {
+        } else if (atyp == 0xF) {
             // Speed test mode
             server->speed_test_mode = true;
             rand_bytes(server->buf->data, SOCKET_BUF_SIZE);
